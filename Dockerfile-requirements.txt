@@ -1,0 +1,26 @@
+# mPower_Rag Docker镜像的依赖
+# 用于生产环境部署
+
+# FastAPI和依赖
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# 向量检索
+qdrant-client==1.7.0
+sentence-transformers==2.2.2
+
+# LLM集成
+httpx==0.25.2
+
+# 工具库
+numpy==1.26.2
+scipy==1.11.4
+
+# 日志和监控
+python-json-logger==2.0.7
+
+# 可选：生产环境增强
+# prometheus-fastapi-instrumentator==6.1.0
+# sentry-sdk[fastapi]==1.39.2

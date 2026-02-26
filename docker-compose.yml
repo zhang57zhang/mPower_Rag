@@ -1,0 +1,126 @@
+# mPower_Rag Docker Compose配置
+# 用于生产环境部署
+
+version: '3.8'
+
+services:
+  # Qdrant向量数据库
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mpower-rag-qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__LOG_LEVEL=INFO
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mpower-rag-network
+
+  # API服务
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mpower-rag-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./knowledge_base:/app/knowledge_base:ro
+      - ./logs:/app/logs
+      - ./models:/app/models
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-false}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mpower-rag-network
+
+  # 前端界面（可选）
+  frontend:
+    image: python:3.14-slim
+    container_name: mpower-rag-frontend
+    working_dir: /app
+    command: >
+      sh -c "pip install streamlit &&
+             streamlit run frontend/app.py
+             --server.port=8501
+             --server.address=0.0.0.0"
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      - ./knowledge_base:/app/knowledge_base:ro
+    environment:
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_PORT=8501
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - mpower-rag-network
+
+  # Prometheus监控（可选）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mpower-rag-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: unless-stopped
+    networks:
+      - mpower-rag-network
+
+  # Grafana可视化（可选）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mpower-rag-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - mpower-rag-network
+
+volumes:
+  qdrant_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  mpower-rag-network:
+    driver: bridge
