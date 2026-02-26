@@ -1,0 +1,617 @@
+# 缓存功能使用指南
+
+**版本**: 1.0
+**最后更新**: 2026-02-23
+
+---
+
+## 📋 功能概述
+
+缓存功能可以显著提升 RAG 系统的性能，减少重复查询的响应时间和资源消耗。
+
+### 核心特性
+
+- ✅ **Redis 缓存** - 基于 Redis 的分布式缓存
+- ✅ **多层缓存** - 支持查询缓存、检索缓存、LLM 响应缓存
+- ✅ **灵活配置** - 可配置 TTL、键前缀等
+- ✅ **缓存统计** - 实时查看缓存状态和命中率
+- ✅ **缓存管理** - 支持清空指定前缀或全部缓存
+
+---
+
+## 🏗️ 架构设计
+
+### 缓存层次
+
+```
+用户请求
+    ↓
+L1: 查询缓存（query）
+    ├── 命中 → 直接返回
+    └── 未命中 → 继续查询
+        ↓
+L2: 检索缓存（retrieval）
+    ├── 命中 → 返回检索结果
+    └── 未命中 → 执行检索
+        ↓
+L3: LLM 缓存（llm）
+    ├── 命中 → 返回生成答案
+    └── 未命中 → 调用 LLM
+        ↓
+        将结果存入各层缓存
+```
+
+### 缓存键结构
+
+```
+前缀:MD5哈希
+
+示例：
+- query:5d41402abc4b2a76b9719d911017c592
+- retrieval:a1b2c3d4e5f6g7h8i9j0k1l2m3n4
+- llm:1a2b3c4d5e6f7g8h9i0j1k2l3m4n5
+- rerank:2a3b4c5d6e7g8h9i0j1k2l3m4n5o6
+```
+
+---
+
+## 🎯 使用场景
+
+### 1. 查询缓存
+
+**场景**: 用户重复提问相同问题
+**缓存键**: `query:{MD5(问题 + 参数）}`
+**TTL**: 1 小时（默认）
+**效果**: 几乎零延迟返回
+
+### 2. 检索缓存
+
+**场景**: 相似查询的检索结果
+**缓存键**: `retrieval:{MD5(问题 + top_k + use_rerank）}`
+**TTL**: 1 小时
+**效果**: 避免重复的向量检索
+
+### 3. LLM 缓存
+
+**场景**: 相同 Prompt 的 LLM 响应
+**缓存键**: `llm:{MD5(Prompt + temperature）}`
+**TTL**: 2 小时
+**效果**: 避免重复的 LLM 调用
+
+### 4. 重排序缓存
+
+**场景**: 相同查询的重排序结果
+**缓存键**: `rerank:{MD5(问题 + 方法）}`
+**TTL**: 30 分钟
+**效果**: 避免重复的重排序计算
+
+---
+
+## ⚙️ 配置选项
+
+### 环境变量
+
+```env
+# 缓存配置
+CACHE_ENABLED=true           # 是否启用缓存
+CACHE_TYPE=redis            # 缓存类型（redis, memory）
+CACHE_TTL=3600               # 默认 TTL（秒）
+
+# Redis 配置
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+# REDIS_URL=redis://localhost:6379/0
+```
+
+### 配置文件
+
+```python
+# config/settings.py
+cache_enabled: bool = False
+cache_type: str = "redis"  # redis, memory
+cache_ttl: int = 3600  # 默认 TTL
+
+redis_host: str = "localhost"
+redis_port: int = 6379
+redis_db: int = 0
+redis_password: Optional[str] = None
+redis_url: Optional[str] = None
+```
+
+---
+
+## 🚀 使用指南
+
+### 1. 启动 Redis 服务
+
+#### 方法 1：Docker（推荐）
+
+```bash
+# 启动 Redis 容器
+docker-compose up -d redis
+
+# 查看 Redis 日志
+docker logs -f redis
+```
+
+#### 方法 2：本地安装
+
+```bash
+# Windows: 下载 Redis for Windows
+https://github.com/tporadowski/redis/releases
+
+# Linux/Mac: 使用包管理器
+sudo apt-get install redis-server  # Ubuntu/Debian
+brew install redis  # macOS
+```
+
+### 2. 启动 RAG 服务（启用缓存）
+
+#### 方式 1：API 启动
+
+```bash
+# 设置环境变量
+export CACHE_ENABLED=true
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+
+# 启动 API
+python -m uvicorn src.api.main_cached:app --host 0.0.0.0 --port 8000
+```
+
+#### 方式 2：前端启动
+
+```bash
+streamlit run frontend/app.py --server.port 8501
+```
+
+### 3. 测试缓存功能
+
+#### 查看缓存统计
+
+```bash
+# 使用测试脚本
+python scripts\test_cache.py
+
+# 或使用 API
+curl http://localhost:8000/api/v1/cache/stats
+```
+
+#### 测试查询缓存
+
+```bash
+# 运行测试脚本
+python scripts\test_cache.py
+
+# 输出示例：
+# 测试 2: 查询缓存
+# 问题: 什么是车载测试？
+# 第 1 次查询（应该不命中）:
+#  - 响应时间: 2.34 秒
+#  - 来自缓存: False
+# 第 2 次查询（应该命中）:
+#  - 响应时间: 0.05 秒
+#  - 来自缓存: True
+#  - 性能提升: 46.8x
+```
+
+#### 清空缓存
+
+```bash
+# 清空指定前缀
+curl -X POST http://localhost:8000/api/v1/cache/clear \
+  -H "Content-Type: application/json" \
+  -d '{"prefix": "query"}'
+
+# 清空所有缓存
+curl -X POST http://localhost:8000/api/v1/cache/clear_all
+```
+
+---
+
+## 📊 性能分析
+
+### 预期性能提升
+
+| 指标 | 无缓存 | 有缓存 | 提升幅度 |
+|------|--------|--------|----------|
+| 首次查询 | 2-3 秒 | 2-3 秒 | 无 |
+| 重复查询 | 2-3 秒 | 50-100 ms | 20-60x |
+| 检索时间 | 200-500 ms | 0 ms | 100% |
+| LLM 时间 | 1-2 秒 | 0 ms | 100% |
+| 总响应时间 | 2-3 秒 | 50-100 ms | 20-60x |
+
+### 缓存命中率
+
+| 场景 | 预期命中率 | 说明 |
+|------|-----------|------|
+| 常见问题 | 60-80% | 用户经常问常见问题 |
+| 相似问题 | 30-50% | 用户问相似的问题 |
+| 新问题 | 0% | 新问题无法命中缓存 |
+
+### 资源消耗
+
+| 资源 | 无缓存 | 有缓存 | 增加 |
+|------|--------|--------|------|
+| Redis 内存 | 0 | 100-500 MB | +100-500 MB |
+| CPU 使用 | 中 | 低 | -30% |
+| 网络 IO | 中 | 低 | -50% |
+
+---
+
+## 🎨 前端集成
+
+### Streamlit 集成
+
+```python
+import streamlit as st
+import requests
+
+# 缓存统计面板
+st.sidebar.markdown("### 🚀 缓存状态")
+
+# 获取缓存统计
+response = requests.get("http://localhost:8000/api/v1/cache/stats", timeout=10)
+
+if response.status_code == 200:
+    stats = response.json()
+
+    # 显示缓存状态
+    if stats.get("connected"):
+        st.success("✅ Redis 已连接")
+        st.metric("总键数", stats.get("total_keys", 0))
+
+        # 显示各前缀的键数
+        prefix_counts = stats.get("prefix_counts", {})
+        if prefix_counts:
+            st.write("**各前缀键数**:")
+            for prefix, count in prefix_counts.items():
+                st.write(f"- {prefix}: {count} 个")
+    else:
+        st.error("❌ Redis 未连接")
+
+    # 清空缓存按钮
+    col1, col2 = st.sidebar.columns(2)
+
+    with col1:
+        if st.button("清空所有缓存"):
+            response = requests.post(
+                "http://localhost:8000/api/v1/cache/clear_all",
+                timeout=10,
+            )
+            if response.status_code == 200:
+                st.success("✅ 缓存已清空")
+                st.rerun()
+            else:
+                st.error("❌ 清空失败")
+
+    with col2:
+        # 选择前缀清空
+        prefix_to_clear = st.selectbox(
+            "清空前缀",
+            options=["", "query", "retrieval", "llm", "rerank"]
+        )
+
+        if st.button(f"清空前缀 {prefix_to_clear}") and prefix_to_clear:
+            response = requests.post(
+                "http://localhost:8000/api/v1/cache/clear",
+                json={"prefix": prefix_to_clear},
+                timeout=10,
+            )
+            if response.status_code == 200:
+                st.success(f"✅ 已清空前缀 {prefix_to_clear}")
+                st.rerun()
+            else:
+                st.error("❌ 清空失败")
+else:
+    st.warning("无法获取缓存统计")
+```
+
+---
+
+## 🧪 测试指南
+
+### 运行测试脚本
+
+```bash
+# 运行缓存功能测试
+python scripts\test_cache.py
+```
+
+### 测试覆盖
+
+1. **功能测试**
+   - ✅ 获取缓存统计
+   - ✅ 测试查询缓存
+   - ✅ 测试流式查询缓存
+   - ✅ 清空指定前缀
+   - ✅ 清空所有缓存
+   - ✅ 并发请求缓存
+
+2. **性能测试**
+   - ✅ 缓存命中率测试
+   - ✅ 响应时间对比
+   - ✅ 吞吐量测试
+
+3. **稳定性测试**
+   - ✅ Redis 连接中断
+   - ✅ Redis 内存耗尽
+   - ✅ 网络中断恢复
+
+---
+
+## 🔧 高级功能
+
+### 1. 缓存装饰器
+
+```python
+from core.utils.cache import cache_decorator, get_cache
+from config.settings import settings
+
+# 获取缓存实例
+cache = get_cache(settings.model_dump())
+
+# 使用装饰器
+@cache_decorator(cache, prefix="custom", ttl=3600)
+def expensive_function(query: str) -> str:
+    """耗时的函数"""
+    # 模拟耗时操作
+    import time
+    time.sleep(2)
+    return f"Result for {query}"
+```
+
+### 2. 自定义缓存键
+
+```python
+def custom_key_generator(*args, **kwargs) -> str:
+    """自定义缓存键生成器"""
+    # 提取特定参数作为键
+    query = kwargs.get("query", "")
+    top_k = kwargs.get("top_k", 5)
+
+    # 生成键
+    key_str = f"{query}:{top_k}"
+
+    return key_str
+
+# 使用自定义键生成器
+@cache_decorator(
+    cache,
+    prefix="custom",
+    ttl=3600,
+    key_func=custom_key_generator
+)
+def custom_cache_function(query: str, top_k: int = 5) -> str:
+    """使用自定义键的函数"""
+    return f"Result (top_k={top_k}) for {query}"
+```
+
+### 3. 条件缓存
+
+```python
+@cache_decorator(cache, prefix="conditional", ttl=3600)
+def conditional_cache_function(query: str, use_cache: bool = True) -> str:
+    """条件缓存函数"""
+    if not use_cache:
+        # 标记跳过缓存（可以通过 kwargs 传递）
+        return {"skip_cache": True}  # 实际逻辑需要在装饰器中实现
+
+    return f"Result for {query}"
+```
+
+---
+
+## ⚠️ 注意事项
+
+### 1. Redis 持久化
+
+Redis 默认是内存数据库，重启后数据丢失。如果需要持久化：
+
+```yaml
+# docker-compose.yml
+redis:
+  image: redis:7.0-alpine
+  volumes:
+    - ./data/redis:/data
+    - ./redis.conf:/usr/local/etc/redis/redis.conf
+  command: redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+```
+
+### 2. 缓存一致性
+
+缓存可能导致数据不一致：
+- **问题**: 知识库更新后，缓存仍然是旧数据
+- **解决方案**：
+  1. 添加版本号到缓存键
+  2. 设置较短的 TTL
+  3. 知识库更新时清空相关缓存
+
+### 3. 缓存雪崩
+
+缓存雪崩可能发生：
+- **问题**: 大量缓存同时过期，导致数据库压力
+- **解决方案**：
+  1. 添加随机过期时间（TTL ± 10%）
+  2. 使用多级缓存（L1: Redis, L2: Memory）
+  3. 限流和熔断
+
+### 4. 缓存穿透
+
+缓存穿透可能发生：
+- **问题**: 查询不存在，每次都查询数据库
+- **解决方案**：
+  1. 缓存空值（null cache）
+  2. 使用布隆过滤器
+  3. 请求限流
+
+---
+
+## 🎓 最佳实践
+
+### 1. TTL 设置
+
+| 缓存类型 | 推荐 TTL | 说明 |
+|---------|---------|------|
+| 查询缓存 | 1 小时 | 用户问题可能会变化 |
+| 检索缓存 | 1 小时 | 知识库可能更新 |
+| LLM 缓存 | 2 小时 | Prompt 可能调整 |
+| 重排序缓存 | 30 分钟 | 模型可能更新 |
+
+### 2. 缓存键设计
+
+- ✅ 包含所有影响结果的参数
+- ✅ 使用 MD5 哈希（稳定、快速）
+- ✅ 添加版本号（便于失效）
+- ✅ 避免键冲突
+
+### 3. 缓存监控
+
+- 监控缓存命中率
+- 监控 Redis 内存使用
+- 监控 Redis 响应时间
+- 设置告警阈值
+
+### 4. 缓存清理
+
+- 定期清空过期缓存
+- 知识库更新时清空相关缓存
+- 监控内存使用，必要时清理
+
+---
+
+## 🚀 生产部署
+
+### 1. Redis 集群
+
+生产环境建议使用 Redis 集群：
+
+```yaml
+# docker-compose.yml
+redis-master:
+  image: redis:7.0-alpine
+  command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7000
+  ports:
+    - "7000:7000"
+    - "6379:6379"
+
+redis-slave:
+  image: redis:7.0-alpine
+  command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7001
+  ports:
+    - "7001:7001"
+    - "6380:6380"
+
+redis-sentinel:
+  image: redis:7.0-alpine
+  command: redis-sentinel /etc/redis/sentinel.conf
+  ports:
+    - "26379:26379"
+```
+
+### 2. 持久化配置
+
+```yaml
+# redis.conf
+save 900 1
+save 300 10
+save 60 10000
+appendonly yes
+```
+
+### 3. 监控和告警
+
+```yaml
+# 监控指标
+- Redis 内存使用率
+- 缓存命中率
+- 平均响应时间
+- 错误率
+
+# 告警规则
+- 内存使用率 > 80%
+- 缓存命中率 < 20%
+- 平均响应时间 > 500ms
+- 错误率 > 5%
+```
+
+---
+
+## 🆘 常见问题
+
+### Q: 缓存不生效？
+A: 检查以下几点：
+1. 确认 Redis 已启动
+2. 确认 `CACHE_ENABLED=true`
+3. 确认 Redis 连接配置正确
+4. 检查 Redis 日志
+
+### Q: 如何避免缓存雪崩？
+A:
+1. 添加随机过期时间（TTL ± 10%）
+2. 使用多级缓存（L1: Redis, L2: Memory）
+3. 限流和熔断
+
+### Q: 如何处理缓存一致性？
+A:
+1. 添加版本号到缓存键
+2. 设置合理的 TTL
+3. 知识库更新时清空相关缓存
+
+### Q: 如何优化缓存命中率？
+A:
+1. 分析用户查询模式
+2. 调整缓存 TTL
+3. 优化缓存键设计
+4. 预热常用查询
+
+### Q: Redis 内存不足怎么办？
+A:
+1. 检查是否有大量过期键未清理
+2. 设置 `maxmemory-policy`（如 allkeys-lru）
+3. 考虑使用 Redis 集群
+
+---
+
+## 📚 参考资料
+
+### Redis 文档
+- [Redis 官网](https://redis.io/)
+- [Redis 命令参考](https://redis.io/commands)
+- [Redis 持久化](https://redis.io/topics/persistence)
+
+### 缓存设计
+- [缓存设计模式](https://docs.microsoft.com/en-us/azure/architecture/best-practices/caching)
+- [缓存策略](https://aws.amazon.com/caching-strategies/)
+
+### 监控工具
+- [Redis Insights](https://redis.com/insights/)
+- [Prometheus + Grafana](https://prometheus.io/)
+- [Redis Exporter](https://github.com/oliver006/redis_exporter)
+
+---
+
+## 🎯 下一步
+
+### 短期改进
+1. 添加缓存预热功能
+2. 实现多级缓存
+3. 添加缓存监控面板
+
+### 中期改进
+4. 实现智能缓存策略（LRU、LFU）
+5. 添加缓存穿透防护
+6. 优化缓存命中率
+
+### 长期改进
+7. 实现分布式缓存集群
+8. 添加缓存一致性保证
+9. 实现缓存自动扩容
+
+---
+
+**最后更新**: 2026-02-23
+**版本**: 1.0
+**维护者**: AI 助手
