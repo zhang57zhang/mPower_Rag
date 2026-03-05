@@ -25,7 +25,8 @@
 
 ![mPower_Rag Architecture](https://img.shields.io/badge/Architecture-3--Tier%20RAG-blue)
 ![Performance](https://img.shields.io/badge/Response%20Time-%3C2.5s-green)
-![Tests](https://img.shields.io/badge/Tests-14%2F14-passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-27%2F27-passing-brightgreen)
+![API](https://img.shields.io/badge/API%20Endpoints-10-blue)
 
 ## 📋 项目概述
 
@@ -37,7 +38,24 @@ mPower_Rag 是一个专为车载测试领域设计的智能问答系统，采用
 - **智能混合检索**: 向量检索 + 关键词检索 + 智能合并
 - **零依赖启动**: 本地TF-IDF立即可用
 - **生产就绪**: Docker容器化 + 监控 + 自动部署
-- **完整测试**: 14个测试用例，100%通过率
+- **完整测试**: 27个测试用例，100%通过率
+- **✨ 文档管理增强**: 多格式支持 + 批量操作 + 外部API集成
+
+### 🆕 最新更新（2026-03-05）
+
+**Phase 1 - 核心功能：**
+- ✅ 多格式文档解析（TXT/MD/DOCX/XLSX/PDF）
+- ✅ 文档删除功能（单个/批量）
+- ✅ 外部API集成（导入+查询）
+- ✅ 文档列表查询
+
+**Phase 2 - 优化增强：**
+- ✅ 批量上传接口
+- ✅ 目录导入功能
+- ✅ 文档大小限制检查（10MB）
+- ✅ 性能优化
+
+**测试结果：** 13/13 通过（100%）
 
 ---
 
