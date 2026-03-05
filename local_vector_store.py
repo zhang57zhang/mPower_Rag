@@ -120,6 +120,39 @@ class LocalVectorStore:
             logger.error(f"添加文档失败: {e}")
             return False
 
+    def delete_document(self, doc_id: str) -> bool:
+        """
+        删除文档
+
+        Args:
+            doc_id: 文档ID
+
+        Returns:
+            是否删除成功
+        """
+        try:
+            # 查找文档索引
+            doc_index = None
+            for i, doc in enumerate(self.documents):
+                if doc["id"] == doc_id:
+                    doc_index = i
+                    break
+
+            if doc_index is None:
+                logger.warning(f"文档不存在: {doc_id}")
+                return False
+
+            # 删除文档和向量
+            self.documents.pop(doc_index)
+            self.document_vectors.pop(doc_index)
+
+            logger.info(f"成功删除文档: {doc_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"删除文档失败: {e}")
+            return False
+
     def search(
         self,
         query: str,

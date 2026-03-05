@@ -18,6 +18,7 @@ class EnhancedRAGEngine:
         """初始化引擎"""
         self.use_vector = use_vector
         self.documents = []  # 关键词检索用
+        self.document_ids = {}  # 文档ID映射 {doc_id: index}
         self.vector_engine = None  # 向量检索引擎
         self.is_initialized = False
         self.llm_client = None
@@ -47,30 +48,109 @@ class EnhancedRAGEngine:
 
     def add_documents(self, documents: List[Document]):
         """添加文档到知识库"""
-        self.documents.extend(documents)
+        for doc in documents:
+            # 生成唯一ID
+            doc_id = self._generate_doc_id(doc)
+            doc_index = len(self.documents)
 
-        # 添加到向量数据库
-        if self.vector_engine:
-            vector_docs = []
-            for i, doc in enumerate(documents):
-                vector_docs.append({
-                    "id": self._generate_doc_id(doc),
+            # 添加到文档列表
+            self.documents.append(doc)
+            self.document_ids[doc_id] = doc_index
+
+            # 添加到向量数据库
+            if self.vector_engine:
+                vector_doc = {
+                    "id": doc_id,
                     "content": doc.page_content,
                     "source": doc.metadata.get("source", ""),
                     "metadata": doc.metadata
-                })
-
-            success = self.vector_engine.add_documents(vector_docs)
-            if success:
-                logger.info(f"成功添加 {len(documents)} 个文档到向量数据库")
+                }
+                self.vector_engine.add_documents([vector_doc])
 
         logger.info(f"添加了 {len(documents)} 个文档到知识库")
 
     def _generate_doc_id(self, doc: Document) -> str:
         """生成文档唯一ID"""
         content_hash = hashlib.md5(doc.page_content.encode()).hexdigest()[:8]
-        source = doc.metadata.get("source", "unknown")
+        source = doc.metadata.get("filename", doc.metadata.get("source", "unknown"))
+        # 清理source中的特殊字符
+        source = source.replace(".", "_").replace(" ", "_")[:20]
         return f"{source}_{content_hash}"
+
+    def remove_document(self, doc_id: str) -> bool:
+        """
+        删除单个文档
+
+        Args:
+            doc_id: 文档ID
+
+        Returns:
+            是否删除成功
+        """
+        if doc_id not in self.document_ids:
+            logger.warning(f"文档不存在: {doc_id}")
+            return False
+
+        try:
+            # 获取文档索引
+            doc_index = self.document_ids[doc_id]
+
+            # 从文档列表中删除
+            self.documents.pop(doc_index)
+
+            # 从ID映射中删除
+            del self.document_ids[doc_id]
+
+            # 更新索引映射（因为删除了一个文档，后面的索引都要-1）
+            for id_key in list(self.document_ids.keys()):
+                if self.document_ids[id_key] > doc_index:
+                    self.document_ids[id_key] -= 1
+
+            # 从向量数据库中删除
+            if self.vector_engine:
+                self.vector_engine.delete_document(doc_id)
+
+            logger.info(f"成功删除文档: {doc_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"删除文档失败: {e}")
+            return False
+
+    def remove_documents_batch(self, doc_ids: List[str]) -> Dict[str, bool]:
+        """
+        批量删除文档
+
+        Args:
+            doc_ids: 文档ID列表
+
+        Returns:
+            {doc_id: 是否成功}
+        """
+        results = {}
+        for doc_id in doc_ids:
+            results[doc_id] = self.remove_document(doc_id)
+
+        success_count = sum(1 for v in results.values() if v)
+        logger.info(f"批量删除完成: {success_count}/{len(doc_ids)} 成功")
+        return results
+
+    def list_documents(self) -> List[Dict[str, Any]]:
+        """
+        列出所有文档
+
+        Returns:
+            文档列表，每个文档包含id和metadata
+        """
+        docs = []
+        for doc_id, doc_index in self.document_ids.items():
+            doc = self.documents[doc_index]
+            docs.append({
+                "id": doc_id,
+                "metadata": doc.metadata,
+                "content_preview": doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content,
+            })
+        return docs
 
     def search_similar(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """搜索相似文档（向量检索 + 关键词检索）"""

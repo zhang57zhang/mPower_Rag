@@ -133,6 +133,20 @@ class Settings:
         self.CACHE_ENABLED = CACHE_ENABLED
         self.CHUNK_SIZE = CHUNK_SIZE
         self.RERANK_ENABLED = RERANK_ENABLED
+        # DeepSeek aliases
+        self.DEEPSEEK_API_KEY = DEEPSEEK_API_KEY
+        self.DEEPSEEK_BASE_URL = DEEPSEEK_BASE_URL
+        self.DEEPSEEK_MODEL = DEEPSEEK_MODEL
 
 # 创建settings实例
 settings = Settings()
+
+# 模拟的 Document 类（用于测试）
+class Document:
+    """简化的 Document 类"""
+    def __init__(self, page_content: str, metadata: dict = None):
+        self.page_content = page_content
+        self.metadata = metadata or {}
+
+    def __repr__(self):
+        return f"Document(page_content={self.page_content[:50]}..., metadata={self.metadata})"
