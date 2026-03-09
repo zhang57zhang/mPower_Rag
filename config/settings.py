@@ -72,9 +72,51 @@ class Settings(BaseSettings):
     # WebSocket 配置
     websocket_max_connections: int = 100
 
+    # ========== 安全配置 ==========
+
+    # API 认证
+    api_auth_enabled: bool = False
+    api_keys: str = ""  # 逗号分隔的 API Key 列表
+    admin_api_keys: str = ""  # 逗号分隔的管理员 API Key 列表
+
+    # CORS
+    cors_origins: str = "*"  # 逗号分隔的允许域名列表
+    cors_allow_credentials: bool = True
+
+    # Rate Limiting
+    rate_limit_enabled: bool = True
+    rate_limit_requests_per_minute: int = 60
+    rate_limit_burst_size: int = 10
+
+    # 输入限制
+    max_content_length: int = 10 * 1024 * 1024  # 10MB
+    max_query_length: int = 10000
+
+    # 监控配置
+    prometheus_enabled: bool = False
+    prometheus_port: int = 9090
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    def get_api_keys(self) -> list:
+        """获取 API Key 列表"""
+        if not self.api_keys:
+            return []
+        return [k.strip() for k in self.api_keys.split(",") if k.strip()]
+
+    def get_admin_api_keys(self) -> list:
+        """获取管理员 API Key 列表"""
+        if not self.admin_api_keys:
+            return []
+        return [k.strip() for k in self.admin_api_keys.split(",") if k.strip()]
+
+    def get_cors_origins(self) -> list:
+        """获取 CORS 允许的域名列表"""
+        if self.cors_origins == "*":
+            return ["*"]
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 # 创建全局配置实例

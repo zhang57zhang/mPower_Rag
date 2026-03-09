@@ -8,15 +8,18 @@ from pathlib import Path
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Request, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, AsyncGenerator
 import logging
 from pathlib import Path
 import json
 import asyncio
+import time
+import uuid
 
 from config.settings import settings
 from core.rag_engine import get_rag_engine
@@ -25,6 +28,11 @@ from core.vector_store import get_vector_store, VectorStoreManager
 from core.embeddings import get_embeddings
 from data.document_loader import get_document_manager
 from core.conversation import get_conversation_manager
+
+# 导入安全中间件
+from api.middleware.auth import init_auth, verify_api_key, is_whitelisted, User
+from api.middleware.rate_limit import init_rate_limiter, get_rate_limiter
+from api.middleware.security import SecurityMiddleware, SecurityConfig
 
 # 配置日志
 logging.basicConfig(
@@ -40,11 +48,20 @@ app = FastAPI(
     description="车载测试系统 RAG API",
 )
 
-# CORS 中间件
+# 安全中间件
+security_config = SecurityConfig(
+    cors_origins=settings.get_cors_origins(),
+    cors_allow_credentials=settings.cors_allow_credentials,
+    max_content_length=settings.max_content_length,
+    max_query_length=settings.max_query_length,
+)
+app.add_middleware(SecurityMiddleware, config=security_config)
+
+# CORS 中间件（使用配置）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应该限制
-    allow_credentials=True,
+    allow_origins=settings.get_cors_origins(),
+    allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -689,8 +706,8 @@ async def stream_chat(request: StreamChatRequest):
     if _rag_engine is None:
         raise HTTPException(status_code=503, detail="RAG 引擎未初始化")
 
-    async def generate_response():
-        """异步生成流式响应"""
+    async def generate_response() -> AsyncGenerator[str, None]:
+        """异步生成流式响应（SSE 格式）"""
         try:
             # 执行查询
             result = _rag_engine.query_with_sources(
@@ -705,11 +722,9 @@ async def stream_chat(request: StreamChatRequest):
                 k=request.top_k,
             )
 
+            # SSE 格式：data: {...}\n\n
             # 发送第一个 chunk：问题
-            yield {
-                "type": "question",
-                "content": result["question"],
-            }
+            yield f"data: {json.dumps({'type': 'question', 'content': result['question']}, ensure_ascii=False)}\n\n"
 
             # 流式发送答案
             answer = result["answer"]
@@ -717,11 +732,8 @@ async def stream_chat(request: StreamChatRequest):
 
             for i in range(0, len(answer), chunk_size):
                 chunk = answer[i:i + chunk_size]
-                yield {
-                    "type": "content",
-                    "content": chunk,
-                    "done": False,
-                }
+                yield f"data: {json.dumps({'type': 'content', 'content': chunk, 'done': False}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.01)  # 小延迟，确保客户端有时间处理
 
             # 发送最后一个 chunk：完成信号和源文档
             source_docs = []
@@ -732,7 +744,7 @@ async def stream_chat(request: StreamChatRequest):
                     "score": float(score),
                 })
 
-            yield {
+            final_data = {
                 "type": "done",
                 "content": "",
                 "done": True,
@@ -743,14 +755,16 @@ async def stream_chat(request: StreamChatRequest):
                     "source_count": len(source_docs),
                 },
             }
+            yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.error(f"流式生成错误: {e}")
-            yield {
+            error_data = {
                 "type": "error",
                 "content": f"生成失败：{str(e)}",
                 "done": True,
             }
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         generate_response(),
@@ -758,6 +772,7 @@ async def stream_chat(request: StreamChatRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
         },
     )
 
@@ -829,6 +844,94 @@ async def clear_all_cache_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# 增强健康检查
+
+
+class HealthStatus(BaseModel):
+    """健康状态响应"""
+    status: str = "healthy"
+    app_name: str
+    version: str
+    components: Dict[str, Any] = {}
+    timestamp: float
+
+
+@app.get("/health", response_model=HealthStatus)
+@app.get("/health/live", response_model=HealthStatus)
+async def health_check():
+    """健康检查接口（存活探针）"""
+    return HealthStatus(
+        status="healthy",
+        app_name=settings.app_name,
+        version=settings.app_version,
+        timestamp=time.time(),
+    )
+
+
+@app.get("/health/ready", response_model=HealthStatus)
+async def readiness_check():
+    """就绪探针（检查所有依赖）"""
+    components = {}
+
+    # 检查向量存储
+    components["vector_store"] = {
+        "status": "ready" if _vector_store is not None else "not_ready"
+    }
+
+    # 检查 RAG 引擎
+    components["rag_engine"] = {
+        "status": "ready" if _rag_engine is not None else "not_ready"
+    }
+
+    # 检查对话管理器
+    components["conversation_manager"] = {
+        "status": "ready" if _conversation_manager is not None else "not_ready"
+    }
+
+    # 检查 Redis（如果启用缓存）
+    if settings.cache_enabled:
+        try:
+            from core.utils.cache import _cache_instance
+            components["redis"] = {
+                "status": "ready" if _cache_instance and _cache_instance.redis_client else "not_ready"
+            }
+        except Exception:
+            components["redis"] = {"status": "error"}
+
+    # 计算整体状态
+    all_ready = all(
+        c.get("status") in ["ready", "healthy"]
+        for c in components.values()
+    )
+
+    return HealthStatus(
+        status="ready" if all_ready else "not_ready",
+        app_name=settings.app_name,
+        version=settings.app_version,
+        components=components,
+        timestamp=time.time(),
+    )
+
+
+# Prometheus 指标端点
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus 指标端点"""
+    if not settings.prometheus_enabled:
+        raise HTTPException(status_code=404, detail="Prometheus metrics not enabled")
+
+    try:
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        return Response(
+            content=generate_latest(),
+            media_type=CONTENT_TYPE_LATEST
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="prometheus_client not installed")
+
+
 # 启动事件
 
 
@@ -836,13 +939,44 @@ async def clear_all_cache_endpoint():
 async def startup_event():
     """应用启动事件"""
     logger.info(f"启动 {settings.app_name} v{settings.app_version}")
+
+    # 初始化认证
+    if settings.api_auth_enabled:
+        api_keys = settings.get_api_keys()
+        admin_keys = settings.get_admin_api_keys()
+        init_auth(api_keys, admin_keys)
+        logger.info(f"API 认证已启用，有效 Key 数量: {len(api_keys)}")
+    else:
+        logger.warning("API 认证未启用（开发模式）")
+
+    # 初始化限流器
+    if settings.rate_limit_enabled:
+        init_rate_limiter(
+            requests_per_minute=settings.rate_limit_requests_per_minute,
+            burst_size=settings.rate_limit_burst_size,
+            enabled=True
+        )
+
+    # 初始化核心组件
     initialize_components()
+
+    logger.info("所有组件初始化完成，服务就绪")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
     logger.info(f"{settings.app_name} 正在关闭...")
+
+    # 清理资源
+    global _embeddings, _vector_store, _rag_engine, _document_manager, _conversation_manager
+    _embeddings = None
+    _vector_store = None
+    _rag_engine = None
+    _document_manager = None
+    _conversation_manager = None
+
+    logger.info("资源清理完成")
 
 
 if __name__ == "__main__":
