@@ -24,9 +24,10 @@
 ---
 
 ![mPower_Rag Architecture](https://img.shields.io/badge/Architecture-3--Tier%20RAG-blue)
-![Performance](https://img.shields.io/badge/Response%20Time-%3C2.5s-green)
+![Performance](https://img.shields.io/badge/Response%20Time-%3C500ms-green)
 ![Tests](https://img.shields.io/badge/Tests-27%2F27-passing-brightgreen)
-![API](https://img.shields.io/badge/API%20Endpoints-10-blue)
+![API](https://img.shields.io/badge/API%20Endpoints-15-blue)
+![Version](https://img.shields.io/badge/Version-1.0.0-success)
 
 ## 📋 项目概述
 
@@ -41,21 +42,48 @@ mPower_Rag 是一个专为车载测试领域设计的智能问答系统，采用
 - **完整测试**: 27个测试用例，100%通过率
 - **✨ 文档管理增强**: 多格式支持 + 批量操作 + 外部API集成
 
-### 🆕 最新更新（2026-03-05）
+### 🆕 最新更新（2026-03-10）
 
-**Phase 1 - 核心功能：**
+**🎉 v1.0.0 - 生产环境就绪：**
+
+**生产环境优化：**
+- ✅ 完整的生产环境配置（`.env.production`）
+- ✅ 优化的 Dockerfile（多阶段构建，非 root 用户）
+- ✅ 生产部署脚本（`deploy_prod.sh` / `deploy_prod.bat`）
+- ✅ Redis 缓存集成
+- ✅ Prometheus + Grafana 监控
+
+**安全增强：**
+- ✅ API 认证机制（默认启用）
+- ✅ 请求限流（令牌桶算法）
+- ✅ 严格的 CORS 配置
+- ✅ 输入验证和安全中间件
+
+**监控与运维：**
+- ✅ 完整的健康检查（存活、就绪、完整检查）
+- ✅ Prometheus 监控指标
+- ✅ 自动备份脚本
+- ✅ 数据恢复脚本
+- ✅ API 测试脚本
+
+**项目清理：**
+- ✅ 删除 70 个过程文件和非核心文件
+- ✅ 优化项目结构
+- ✅ 更新文档和变更日志
+
+**Phase 1 - 核心功能（已完成）：**
 - ✅ 多格式文档解析（TXT/MD/DOCX/XLSX/PDF）
 - ✅ 文档删除功能（单个/批量）
 - ✅ 外部API集成（导入+查询）
 - ✅ 文档列表查询
 
-**Phase 2 - 优化增强：**
+**Phase 2 - 优化增强（已完成）：**
 - ✅ 批量上传接口
 - ✅ 目录导入功能
 - ✅ 文档大小限制检查（10MB）
 - ✅ 性能优化
 
-**测试结果：** 13/13 通过（100%）
+**测试结果：** 27/27 通过（100%）
 
 ---
 
@@ -145,24 +173,80 @@ echo "前端界面: http://localhost:8501"
 
 ```
 mPower_Rag/
-├── 📂 src/
-│   ├── simple_api.py          # FastAPI服务
-│   ├── simple_rag_engine.py   # RAG核心引擎
-│   ├── vector_search.py       # 向量检索实现
-│   ├── local_vector_store.py  # 本地TF-IDF存储
-│   └── config/               # 配置管理
-│       ├── production.py     # 生产配置
-│       └── logging.py        # 日志配置
-├── 📂 tests/                  # 测试套件
-│   ├── test_vector_store.py
-│   ├── test_rag_engine.py
-│   ├── test_api.py
-│   └── test_performance.py
-├── 📂 frontend/              # Streamlit前端
-│   └── app.py
-├── 📂 knowledge_base/         # 知识库文档
-├── 📂 models/               # 预训练模型
-└── 📂 logs/                 # 日志文件
+├── 📄 核心文档
+│   ├── README.md              # 项目主文档
+│   ├── CHANGELOG.md           # 变更日志
+│   ├── LICENSE                # MIT 许可证
+│   ├── OPTIMIZATION_PLAN_V3.md # 优化计划
+│   └── RELEASE_CHECKLIST.md   # 发布检查清单
+│
+├── 🔧 配置文件
+│   ├── .env.example           # 环境变量示例
+│   ├── .env.production        # 生产环境配置
+│   ├── .env.development       # 开发环境配置
+│   ├── requirements.txt       # Python 依赖
+│   └── prometheus.yml         # Prometheus 配置
+│
+├── 🐳 Docker
+│   ├── Dockerfile             # Docker 镜像
+│   ├── docker-compose.yml     # 开发环境
+│   └── docker-compose.prod.yml # 生产环境
+│
+├── 🚀 部署脚本
+│   ├── deploy_prod.sh         # Linux 部署
+│   ├── deploy_prod.bat        # Windows 部署
+│   └── test_api_prod.sh       # API 测试
+│
+└── 📂 核心目录
+    ├── src/                   # 核心源码
+    │   ├── api/              # API 接口
+    │   │   ├── main.py       # FastAPI 应用
+    │   │   ├── health.py     # 健康检查
+    │   │   ├── monitoring.py # 监控指标
+    │   │   └── middleware/   # 中间件（认证、限流、安全）
+    │   ├── core/             # 核心逻辑
+    │   │   ├── rag_engine.py # RAG 引擎
+    │   │   ├── vector_store.py # 向量存储
+    │   │   ├── embeddings.py # 嵌入模型
+    │   │   ├── conversation.py # 对话管理
+    │   │   ├── rerank.py     # 重排序
+    │   │   └── evaluation.py # 评估
+    │   ├── data/             # 数据处理
+    │   │   └── document_loader.py
+    │   └── utils/            # 工具函数
+    │       ├── cache.py      # 缓存
+    │       └── metrics.py    # 指标
+    ├── tests/                 # 测试代码
+    │   ├── test_api.py
+    │   ├── test_rag_engine.py
+    │   ├── test_vector_store.py
+    │   └── test_performance.py
+    ├── config/                # 配置文件
+    │   ├── settings.py       # 应用配置
+    │   ├── production.py     # 生产配置
+    │   └── logging.py        # 日志配置
+    ├── docs/                  # 文档
+    │   ├── QUICKSTART.md     # 快速开始
+    │   ├── DEPLOYMENT_GUIDE.md # 部署指南
+    │   ├── CONVERSATION_FEATURES.md
+    │   ├── RERANK_GUIDE.md
+    │   └── EVALUATION_GUIDE.md
+    ├── frontend/              # Streamlit 前端
+    │   ├── app.py            # 主应用
+    │   └── evaluation.py     # 评估仪表板
+    ├── scripts/               # 工具脚本
+    │   ├── backup.sh         # 备份脚本
+    │   ├── restore.sh        # 恢复脚本
+    │   ├── test_*.py         # 测试脚本
+    │   └── setup.*           # 安装脚本
+    ├── knowledge_base/        # 知识库文档
+    │   ├── bluetooth_test_guide.txt
+    │   └── ecu_diagnosis_guide.txt
+    ├── k8s/                   # Kubernetes 配置
+    │   └── deploy.yaml
+    └── .github/               # GitHub 配置
+        └── workflows/
+            └── ci-cd.yml
 ```
 
 ---

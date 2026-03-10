@@ -1,6 +1,6 @@
-# mPower_Rag 依赖文件（Python 3.11 适配版）
+# mPower_Rag 依赖文件（v1.1.0 - 功能增强版）
 # 创建时间: 2026-02-23 16:47
-# 更新时间: 2026-03-10 00:18
+# 更新时间: 2026-03-10 13:30
 
 # ========== 核心依赖 ==========
 
@@ -33,15 +33,12 @@ langchain-community==0.0.10
 langchain-openai==0.0.2
 langchain-core==0.1.10
 
-# DeepSeek API（可选）
-# deepseek-api==1.0.0
-
 # ========== 向量数据库 ==========
 
 # Qdrant 客户端
 qdrant-client==1.6.4
 
-# ========== 文档解析 ==========
+# ========== 文档解析（增强） ==========
 
 # PDF 解析
 PyPDF2==3.0.1
@@ -53,12 +50,38 @@ python-docx==1.1.0
 # XLSX 解析
 openpyxl==3.1.2
 
+# PPTX 解析（新增）
+python-pptx==0.6.23
+
+# RTF 解析（新增）
+striprtf==0.0.26
+
 # Markdown 解析
 markdown==3.4.3
 
 # HTML 解析（用于Markdown转换）
 beautifulsoup4==4.12.2
 lxml==5.1.0
+
+# XML 解析（新增）
+xmltodict==0.13.0
+
+# ========== OCR 支持（新增） ==========
+
+# OCR 引擎
+pytesseract==0.3.10
+Pillow==10.2.0
+
+# 注意：需要安装 Tesseract-OCR
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# Linux: sudo apt-get install tesseract-ocr
+# Mac: brew install tesseract
+
+# ========== 文件类型检测（新增） ==========
+
+# 文件类型识别
+python-magic==0.4.27
+python-magic-bin==0.4.14; sys_platform == 'win32'
 
 # ========== 前端 ==========
 
@@ -98,9 +121,6 @@ ruff==0.1.9
 # Redis 客户端
 redis==5.0.1
 
-# 可选：hiredis（C 扩展，性能更好）
-# hiredis==2.3.2
-
 # ========== 监控 ==========
 
 # Prometheus 客户端
@@ -117,7 +137,11 @@ plotly-express==0.4.17
 # 1. LangChain 相关包已包含，支持 Python 3.11
 # 2. 重排序功能需要 sentence-transformers
 #    - 需要联网下载模型（首次使用）
-# 3. 如果安装失败，可以尝试：
+# 3. OCR 功能需要额外安装 Tesseract-OCR
+#    - Windows: 下载安装包
+#    - Linux: sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim
+#    - Mac: brew install tesseract tesseract-lang
+# 4. 如果安装失败，可以尝试：
 #    pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 #    或
 #    pip install -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
