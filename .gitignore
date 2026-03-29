@@ -45,7 +45,6 @@ logs/
 *.log.*
 
 # Data and Models
-data/
 models/
 *.pkl
 *.bin
@@ -60,6 +59,8 @@ qdrant_data/
 # Vector databases
 *.db
 *.sqlite
+
+# Note: src/data/ is NOT ignored (it's source code, not data files)
 
 # Test coverage
 htmlcov/
