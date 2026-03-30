@@ -3,7 +3,7 @@
 自动检测知识库中的矛盾和冲突
 """
 import re
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Iterator
 from dataclasses import dataclass
 from enum import Enum
 import logging

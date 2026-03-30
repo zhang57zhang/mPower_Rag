@@ -2,7 +2,7 @@
 重排序模块
 使用交叉编码器提升检索质量
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 import logging
 from langchain_core.documents import Document
 

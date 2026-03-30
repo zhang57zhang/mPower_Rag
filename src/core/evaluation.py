@@ -2,7 +2,7 @@
 RAG 评估模块
 提供检索和生成的评估指标
 """
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Iterator
 import numpy as np
 from datetime import datetime
 import logging

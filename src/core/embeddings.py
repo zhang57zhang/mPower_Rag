@@ -4,7 +4,7 @@
 """
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from typing import Optional
+from typing import Optional, Iterator
 
 
 class EmbeddingManager:

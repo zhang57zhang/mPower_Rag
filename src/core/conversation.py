@@ -2,7 +2,7 @@
 对话管理模块
 支持多轮对话、会话历史、上下文维护
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 from datetime import datetime
 import json
 import logging

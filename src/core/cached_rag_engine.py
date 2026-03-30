@@ -2,21 +2,21 @@
 缓存增强的 RAG 引擎
 支持查询缓存、向量检索缓存、LLM 响应缓存
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 from langchain_core.callbacks.base import BaseCallbackHandler
-from langchain_core.schema import LLMResult
+from langchain_core.outputs import LLMResult
 import logging
 
 from .vector_store import VectorStoreManager
 from .embeddings import get_embeddings
 from .conversation import ConversationManager
 from .rerank import CrossEncoderReranker
-from .utils.cache import get_cache, cache_decorator, CACHE_PREFIX_QUERY, CACHE_PREFIX_RETRIEVAL, CACHE_PREFIX_LLM
+from utils.cache import get_cache, cache_decorator, CACHE_PREFIX_QUERY, CACHE_PREFIX_RETRIEVAL, CACHE_PREFIX_LLM
 
 logger = logging.getLogger(__name__)
 

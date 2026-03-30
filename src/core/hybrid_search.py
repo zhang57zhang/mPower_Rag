@@ -4,7 +4,7 @@
 """
 import logging
 import math
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Iterator
 from collections import Counter
 from dataclasses import dataclass
 import re

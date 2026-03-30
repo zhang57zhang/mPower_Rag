@@ -5,7 +5,7 @@ Redis 缓存管理器
 import json
 import hashlib
 import logging
-from typing import Any, Optional, Callable, TypeVar, Union
+from typing import Any, Optional, Callable, TypeVar, Union, Dict, List, Iterator
 from functools import wraps
 import pickle
 

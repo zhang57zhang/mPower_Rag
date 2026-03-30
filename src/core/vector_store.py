@@ -2,7 +2,7 @@
 向量数据库管理
 支持 Qdrant 和 Chroma
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 from langchain.vectorstores import Qdrant as LCQdrant
