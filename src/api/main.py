@@ -23,7 +23,7 @@ import uuid
 
 from config.settings import settings
 from core.rag_engine import get_rag_engine
-from core.cached_rag_engine import get_cached_rag_engine, clear_all_cache
+from utils.cache import clear_all_cache
 from core.vector_store import get_vector_store, VectorStoreManager
 from core.embeddings import get_embeddings
 from data.document_loader import get_document_manager
@@ -80,7 +80,7 @@ def initialize_components():
 
     try:
         # 初始化嵌入模型
-        _embeddings = get_embeddings(provider="openai")
+        _embeddings = get_embeddings(provider="huggingface")
 
         # 初始化向量存储
         _vector_store = get_vector_store(
@@ -260,7 +260,7 @@ async def chat(request: QueryRequest):
 
 
 @app.get("/api/v1/search")
-async def search(query: str, top_k: int = 5):
+async def search(query: str, top_k: int = 5, score_threshold: float = None):
     """搜索接口"""
     try:
         if _vector_store is None:
@@ -272,14 +272,28 @@ async def search(query: str, top_k: int = 5):
             k=top_k,
         )
 
-        # 格式化结果
+        # 使用配置的阈值或传入的阈值
+        threshold = score_threshold if score_threshold is not None else settings.retrieval_score_threshold
+
+        # 格式化结果，并过滤低分结果
         results = []
         for doc, score in docs_with_scores:
-            results.append({
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "score": float(score),
-            })
+            # 只保留相似度高于阈值的结果（注意：Chroma的距离越小越相似）
+            # 对于余弦距离，score越小表示越相似
+            if score <= (1 - threshold) * 500:  # 调整阈值计算方式
+                results.append({
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": float(score),
+                })
+
+        # 如果没有找到相关文档，返回提示信息
+        if not results:
+            return {
+                "results": [],
+                "query": query,
+                "message": "未找到与查询相关的知识原子信息，请尝试使用其他关键词或先上传更多文档。"
+            }
 
         return {"results": results, "query": query}
 

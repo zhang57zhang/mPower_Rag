@@ -19,15 +19,15 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     # LLM 配置
-    llm_provider: str = "deepseek"  # deepseek, openai, qwen, glm
-    llm_model: str = "deepseek-chat"
-    llm_api_key: Optional[str] = None
-    llm_base_url: str = "https://api.deepseek.com"
+    llm_provider: str = "glm"  # deepseek, openai, qwen, glm
+    llm_model: str = "glm-4-flash"
+    llm_api_key: Optional[str] = "10d6cc8dd0194922acefb23f6b82ec7a.x0RZOCgDnrSK1Fvb"
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     llm_temperature: float = 0.7
     llm_max_tokens: int = 2000
 
     # 向量数据库配置
-    vector_db_type: str = "qdrant"  # qdrant, chroma
+    vector_db_type: str = "chroma"  # qdrant, chroma
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
     qdrant_collection: str = "vehicle_test_knowledge"
