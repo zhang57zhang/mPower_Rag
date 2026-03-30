@@ -326,6 +326,16 @@ async def upload_document(
 
         # 加载并分割文档
         chunks = _document_manager.load_and_split(str(file_path))
+        
+        # 添加到向量库
+        if chunks:
+            ids = _vector_store.add_documents(chunks)
+        
+        return UploadResponse(
+            message=f"文档 {file.filename} 上传成功",
+            document_count=1,
+            chunk_count=len(chunks),
+        )
 
         # 添加到向量库
         if chunks:
