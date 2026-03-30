@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # LLM 配置
     llm_provider: str = "glm"  # deepseek, openai, qwen, glm
-    llm_model: str = "glm-4-6v"
+    llm_model: str = "glm-4-flash"  # 可用模型: glm-4-flash, glm-4, glm-4-plus
     llm_api_key: Optional[str] = "10d6cc8dd0194922acefb23f6b82ec7a.x0RZOCgDnrSK1Fvb"
     llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     llm_temperature: float = 0.7

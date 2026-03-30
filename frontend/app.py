@@ -164,7 +164,7 @@ def send_message(conversation_id: str, question: str, top_k: int = 5, use_histor
         response = requests.post(
             f"{API_BASE_URL}/conversations/{conversation_id}/messages",
             json={"question": question, "top_k": top_k, "use_history": use_history},
-            timeout=60,
+            timeout=120,
         )
         response.raise_for_status()
         return response.json()
@@ -451,7 +451,7 @@ def main():
                     response = requests.post(
                         f"{API_BASE_URL}/documents/upload",
                         files=files,
-                        timeout=60,
+                        timeout=120,
                     )
 
                     if response.status_code == 200:
@@ -473,9 +473,25 @@ def main():
 
         with col2:
             if st.button("🗑️ 清空知识库"):
-                st.warning("⚠️ 此操作不可逆")
-                if st.confirm("确定要清空知识库吗？"):
-                    st.error("清空功能暂未实现")
+                st.warning("⚠️ 此操作不可逆，将删除所有知识块！")
+                # 使用 session_state 来确认删除
+                if 'confirm_clear' not in st.session_state:
+                    st.session_state.confirm_clear = False
+                
+                col_confirm1, col_confirm2 = st.columns(2)
+                with col_confirm1:
+                    if st.button("✅ 确认清空"):
+                        try:
+                            response = requests.post(f"{API_BASE_URL}/cache/clear_all", timeout=30)
+                            if response.status_code == 200:
+                                st.success("知识库已清空")
+                            else:
+                                st.error(f"清空失败: {response.text}")
+                        except Exception as e:
+                            st.error(f"清空错误: {e}")
+                with col_confirm2:
+                    if st.button("❌ 取消"):
+                        st.info("已取消")
 
     # 页脚
     st.markdown("---")

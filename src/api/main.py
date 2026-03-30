@@ -272,19 +272,25 @@ async def search(query: str, top_k: int = 5, score_threshold: float = None):
             k=top_k,
         )
 
-        # 使用配置的阈值或传入的阈值
-        threshold = score_threshold if score_threshold is not None else settings.retrieval_score_threshold
+        # 使用配置的阈值或传入的阈值（默认降低阈值以获得更多结果）
+        threshold = score_threshold if score_threshold is not None else 0.1  # 降低默认阈值
 
         # 格式化结果，并过滤低分结果
         results = []
         for doc, score in docs_with_scores:
-            # 只保留相似度高于阈值的结果（注意：Chroma的距离越小越相似）
-            # 对于余弦距离，score越小表示越相似
-            if score <= (1 - threshold) * 500:  # 调整阈值计算方式
+            # Chroma使用L2距离，距离越小越相似
+            # 将距离转换为相似度分数 (0-1范围)
+            # 使用更合理的转换公式
+            max_distance = 500  # 假设最大距离
+            similarity = max(0, 1 - (score / max_distance))
+            
+            # 只保留相似度高于阈值的结果
+            if similarity >= threshold:
                 results.append({
                     "content": doc.page_content,
                     "metadata": doc.metadata,
                     "score": float(score),
+                    "similarity": float(round(similarity, 3)),
                 })
 
         # 如果没有找到相关文档，返回提示信息
@@ -359,13 +365,8 @@ async def get_documents_stats():
         if _vector_store is None:
             raise HTTPException(status_code=503, detail="向量存储未初始化")
 
-        # 这里简化实现，实际应该从向量数据库获取统计信息
-        stats = {
-            "total_documents": 0,
-            "total_chunks": 0,
-            "collections": [settings.qdrant_collection],
-        }
-
+        # 从向量数据库获取真实统计信息
+        stats = _vector_store.get_stats()
         return stats
 
     except Exception as e:

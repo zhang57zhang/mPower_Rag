@@ -167,6 +167,46 @@ class VectorStoreManager:
             # Chroma 删除方式
             self.vector_store.delete(ids)
 
+    def get_stats(self) -> Dict[str, Any]:
+        """获取向量库统计信息"""
+        if self.db_type == "chroma":
+            # Chroma 统计
+            try:
+                # 获取集合中的文档数量
+                collection = self.vector_store._collection
+                count = collection.count()
+                return {
+                    "total_documents": count,  # Chroma中难以区分文档和块
+                    "total_chunks": count,
+                    "collection_name": self.collection_name,
+                }
+            except Exception as e:
+                return {
+                    "total_documents": 0,
+                    "total_chunks": 0,
+                    "error": str(e),
+                }
+        else:
+            # Qdrant 统计
+            try:
+                client = QdrantClient(
+                    host=self.kwargs.get("host", "localhost"),
+                    port=self.kwargs.get("port", 6333),
+                    api_key=self.kwargs.get("api_key"),
+                )
+                info = client.get_collection(self.collection_name)
+                return {
+                    "total_documents": info.points_count,
+                    "total_chunks": info.points_count,
+                    "collection_name": self.collection_name,
+                }
+            except Exception as e:
+                return {
+                    "total_documents": 0,
+                    "total_chunks": 0,
+                    "error": str(e),
+                }
+
     def clear(self):
         """清空所有文档"""
         if self.db_type == "qdrant":
