@@ -856,8 +856,6 @@ async def clear_cache_endpoint(request: ClearCacheRequest):
 async def clear_all_cache_endpoint():
     """清空所有缓存"""
     try:
-        from core.utils.cache import clear_all_cache
-
         result = clear_all_cache()
         return ClearCacheResponse(
             message="已清空所有缓存" if result else "清空失败",

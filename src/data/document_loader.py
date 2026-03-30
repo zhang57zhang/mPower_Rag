@@ -154,8 +154,41 @@ class DocumentManager:
         encoding: str = "utf-8",
     ) -> List[Document]:
         """加载纯文本文件"""
-        with open(file_path, "r", encoding=encoding) as f:
-            content = f.read()
+        try:
+            # 先以二进制方式读取，检测是否为文本文件
+            with open(file_path, "rb") as f:
+                raw_content = f.read()
+            
+            # 检测是否包含大量不可打印字符（二进制文件）
+            null_count = raw_content.count(b'\x00')
+            if null_count > len(raw_content) * 0.1:  # 如果超过10%是null字节
+                logger.warning(f"文件 {file_path} 可能是二进制文件，跳过解析")
+                return []
+            
+            # 尝试解码为文本
+            try:
+                content = raw_content.decode(encoding)
+            except UnicodeDecodeError:
+                # 尝试其他编码
+                for enc in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
+                    try:
+                        content = raw_content.decode(enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                else:
+                    logger.warning(f"无法解码文件 {file_path}，跳过解析")
+                    return []
+            
+            # 检查内容是否主要是可打印字符
+            printable_ratio = sum(1 for c in content if c.isprintable() or c in '\n\r\t') / max(len(content), 1)
+            if printable_ratio < 0.7:  # 如果少于70%是可打印字符
+                logger.warning(f"文件 {file_path} 内容不可打印字符过多，跳过解析")
+                return []
+            
+        except Exception as e:
+            logger.error(f"读取文件 {file_path} 失败: {e}")
+            return []
         
         return self._split_content(
             content=content,
